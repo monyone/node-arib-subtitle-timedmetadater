@@ -1,17 +1,17 @@
 # node-arib-subtitle-unrecognizer
 
-A FFmpeg subtitle unrecognizer.
+Translate arib subtitle to id3 timedmatadata 
 
 ## Feature
 
-* Unrecognizer FFmpeg's subtitle detection for ISDB-T
+* Copy ARIB subtitle as timedmetadata
 
 ## Usage
 
 ```bash
-npm install -g arig-subtitle-unrecognizer
+npm install -g arib-subtitle-timedmetadater
 
-(source) | arig-subtitle-unrecognizer | (dest)
+(source) | arib-subtitle-timedmetadater | (dest)
 ```
 
 ## Build
@@ -19,12 +19,12 @@ npm install -g arig-subtitle-unrecognizer
 ### Preparing
 
 ```bash
-git clone https://github.com/monyone/node-arib-subtitle-unrecognizer
-cd node-arib-mpeg2ts-unrecognizer
+git clone https://github.com/monyone/node-arib-subtitle-timedmetadater
+cd node-arib-subtitle-timedmetadater
 yarn
 ```
 
-### Compiling aribb24.js library
+### Compiling library
 
 ```bash
 yarn run build
