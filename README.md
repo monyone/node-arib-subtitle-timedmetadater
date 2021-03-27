@@ -1,4 +1,4 @@
-# node-arib-subtitle-unrecognizer
+# node-arib-subtitle-timedmetadater
 
 Translate arib subtitle to id3 timedmatadata 
 
