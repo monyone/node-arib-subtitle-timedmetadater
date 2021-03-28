@@ -8,7 +8,7 @@ import { TSPES, TSPESQueue } from 'arib-mpeg2ts-parser';
 
 import ID3 from './id3'
 
-export default class UnrecognizeTransform extends Transform {
+export default class MetadataTransform extends Transform {
   private packetQueue = new TSPacketQueue();
   private PAT_TSSectionQueue = new TSSectionQueue();
   private PMT_TSSectionQueues = new Map<number, TSSectionQueue>();
