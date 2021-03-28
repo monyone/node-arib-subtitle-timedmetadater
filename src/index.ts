@@ -175,7 +175,7 @@ export default class MetadataTransform extends Transform {
         Subtitle_TSPESQueue.push(packet);
         while (!Subtitle_TSPESQueue.isEmpty()) {
           const SubtitlePES = Subtitle_TSPESQueue.pop()!;
-          
+
           let pts = 0;
           pts <<= 3; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 0] & 0x0E) >> 1);
           pts <<= 8; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 1] & 0xFF) >> 0);
@@ -193,7 +193,8 @@ export default class MetadataTransform extends Transform {
           } // FIXME!
 
           const timedMetadataPID = this.Subtitle_ID3Pids.get(pid)!;
-          const timedMetadataPES = ID3.timedmetadata(pts, SubtitlePES.toString('base64'));
+          const subtitleData = SubtitlePES.slice(TSPES.PES_HEADER_SIZE + (3 + PES_header_data_length));
+          const timedMetadataPES = ID3.timedmetadata(pts, subtitleData.toString('base64'));
 
           let begin = 0
           while (begin < timedMetadataPES.length) {

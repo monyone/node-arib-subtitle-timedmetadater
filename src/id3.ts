@@ -98,7 +98,7 @@ export default class ID3 {
       ((txxx_payload.length & 0xFE00000) >> 21),
       ((txxx_payload.length & 0x01FC000) >> 14),
       ((txxx_payload.length & 0x0003F80) >>  7),
-      ((txxx_payload.length & 0x000007F) >>  9),
+      ((txxx_payload.length & 0x000007F) >>  0),
     ]);
     const txxx_frame = Buffer.concat([
       Buffer.from([0x54, 0x58, 0x58, 0x58]),
@@ -110,7 +110,7 @@ export default class ID3 {
       ((txxx_frame.length & 0xFE00000) >> 21),
       ((txxx_frame.length & 0x01FC000) >> 14),
       ((txxx_frame.length & 0x0003F80) >>  7),
-      ((txxx_frame.length & 0x000007F) >>  9),
+      ((txxx_frame.length & 0x000007F) >>  0),
     ]);
 
     return Buffer.concat([
@@ -125,13 +125,15 @@ export default class ID3 {
       0x00, 0x00, 0x01, 0xbd, // +2 bytes
     ]);
     const flags = Buffer.from([
-      0x84, 0x80, // +1 byte
+      0x84, 0x80, // (10, 00, 0, 0, 0, 0), (10 (PTS only), 0, 0, 0, 0, 0, 0, 0) +1 byte
     ]);
     const PTS = Buffer.from([
       ((2 << 4) | (((pts & 0x1C0000000) >> 30) << 1) | 1),
-      ((((pts & 0x3FFF8000) >> 15) << 1) | 1),
-      ((((pts & 0x7FFF) >> 0) << 1) | 1),
-    ])
+      ((((pts & 0x3FFF8000) >> 15) << 1) & 0xFF00) >> 8,
+      ((((pts & 0x3FFF8000) >> 15) << 1) & 0x00FF) | 1,
+      ((((pts & 0x7F00) >> 0) << 1) & 0xFF00) >> 8,
+      ((((pts & 0x00FF) >> 0) << 1) & 0x00FF) | 1,
+    ]);
 
     const id3 = this.ID3v2TXXX(text);
     // TSPES.PES_HEADER_SIZE + flags + PES_header_data_length + PTS + payload
