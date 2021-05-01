@@ -29,7 +29,7 @@ if (options.udp_port) {
   server.on('message', (msg: Buffer) => {
     setImmediate(() => { src.write(msg); });
   })
-  server.bind(options.port);
+  server.bind(options.udp_port);
 } else {
   const stream = options.input == null || options.input === '-' ? process.stdin : fs.createReadStream(options.input);
   stream.pipe(src);

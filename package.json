@@ -1,6 +1,6 @@
 {
   "name": "arib-subtitle-timedmetadater",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "main": "dist/index.js",
   "bin": {
     "arib-subtitle-timedmetadater": "dist/arib-subtitle-timedmetadater.js"
