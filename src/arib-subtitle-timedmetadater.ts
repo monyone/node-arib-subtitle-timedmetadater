@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import dgram from 'dgram';
+import net from 'net';
 import { PassThrough } from 'stream';
 
 import MetadataTransform from './index'
@@ -11,6 +12,7 @@ const program = new Command();
 
 program
   .option('-i, --input <path>', 'input mpeg2ts path')
+  .option('-t, --tcp_port <port>', 'input tcp port')
   .option('-u, --udp_port <port>', 'input udp port')
   .option('-o, --output <path>', 'output mpeg2ts path')
 program.parse(process.argv);
@@ -24,10 +26,15 @@ src
   .pipe(new MetadataTransform())
   .pipe(dst);
 
-if (options.udp_port) {
+if (options.tcp_port) {
+  const server = net.createServer((socket) => {
+    socket.pipe(src);
+  });
+  server.listen(options.tcp_port);
+} else if (options.udp_port) {
   const server = dgram.createSocket('udp4');
   server.on('message', (msg: Buffer) => {
-    setImmediate(() => { src.write(msg); });
+    src.write(msg);
   })
   server.bind(options.udp_port);
 } else {
