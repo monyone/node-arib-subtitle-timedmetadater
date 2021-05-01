@@ -11,7 +11,7 @@ const program = new Command();
 
 program
   .option('-i, --input <path>', 'input mpeg2ts path')
-  .option('-u, --udp-port <port>', 'input udp port')
+  .option('-u, --udp_port <port>', 'input udp port')
   .option('-o, --output <path>', 'output mpeg2ts path')
 program.parse(process.argv);
 const options = program.opts();
@@ -24,7 +24,7 @@ src
   .pipe(new MetadataTransform())
   .pipe(dst);
 
-if (options.port) {
+if (options.udp_port) {
   const server = dgram.createSocket('udp4');
   server.on('message', (msg: Buffer) => {
     setImmediate(() => { src.write(msg); });
