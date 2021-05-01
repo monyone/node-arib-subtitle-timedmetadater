@@ -1,9 +1,9 @@
 {
   "name": "arib-subtitle-timedmetadater",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "main": "dist/index.js",
   "bin": {
-    "arib-subtitle-unrecognizer": "dist/arib-subtitle-timedmetadater.js"
+    "arib-subtitle-timedmetadater": "dist/arib-subtitle-timedmetadater.js"
   },
   "types": "d.ts/index.d.ts",
   "files": [
