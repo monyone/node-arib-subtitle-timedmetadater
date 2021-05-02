@@ -177,11 +177,11 @@ export default class MetadataTransform extends Transform {
           const SubtitlePES = Subtitle_TSPESQueue.pop()!;
 
           let pts = 0;
-          pts <<= 3; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 0] & 0x0E) >> 1);
-          pts <<= 8; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 1] & 0xFF) >> 0);
-          pts <<= 7; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 2] & 0xFE) >> 1);
-          pts <<= 8; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 3] & 0xFF) >> 0);
-          pts <<= 7; pts |= ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 4] & 0xFE) >> 1);
+          pts *= (1 << 3); pts += ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 0] & 0x0E) >> 1);
+          pts *= (1 << 8); pts += ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 1] & 0xFF) >> 0);
+          pts *= (1 << 7); pts += ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 2] & 0xFE) >> 1);
+          pts *= (1 << 8); pts += ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 3] & 0xFF) >> 0);
+          pts *= (1 << 7); pts += ((SubtitlePES[TSPES.PES_HEADER_SIZE + 3 + 4] & 0xFE) >> 1);
 
           const PES_header_data_length = SubtitlePES[TSPES.PES_HEADER_SIZE + 2];
           const PES_data_packet_header_length = (SubtitlePES[(TSPES.PES_HEADER_SIZE + 3) + PES_header_data_length + 2] & 0x0F);
