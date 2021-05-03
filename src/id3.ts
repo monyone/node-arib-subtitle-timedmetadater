@@ -125,7 +125,7 @@ export default class ID3 {
       0x00, 0x00, 0x01, 0xbd, // +2 bytes
     ]);
     const flags = Buffer.from([
-      0x84, 0x80, // (10, 00, 0, 0, 0, 0), (10 (PTS only), 0, 0, 0, 0, 0, 0, 0) +1 byte
+      0x84, 0x80, // (10, 00, 1, 0, 0, 0), (10 (PTS only), 0, 0, 0, 0, 0, 0, 0) +1 byte
     ]);
     const PTS = Buffer.from([
       ((2 << 4) | (((pts / (1 << 30)) & 0x7) << 1) | 1),
@@ -139,22 +139,23 @@ export default class ID3 {
     // TSPES.PES_HEADER_SIZE + flags + PES_header_data_length + PTS + payload
     const without_padding_length = TSPES.PES_HEADER_SIZE + 2 + 1 + 5 + id3.length;
     const packet_payload_size = (TSPacket.PACKET_SIZE - TSPacket.HEADER_SIZE);
-    const PES_header_data_length = packet_payload_size - (without_padding_length % packet_payload_size);
+    const stuffing_length = packet_payload_size - (without_padding_length % packet_payload_size);
 
     const payload = Buffer.concat([
       flags,
-      Buffer.from([PES_header_data_length]),
+      Buffer.from([5] /* PTS */),
       PTS,
-      Buffer.alloc(PES_header_data_length, 0xFF),
+      Buffer.alloc(5, 0), /* FIXME: なぜか native, hls.js で 5 byte 分 id3 の先頭が欠けてしまう... なぜ? */
       id3,
     ]);
 
     return Buffer.concat([
       header,
       Buffer.from([
-        ((payload.length & 0xFF00) >> 8), ((payload.length & 0x00FF) >> 0),
+        (((payload.length + stuffing_length) & 0xFF00) >> 8), (((payload.length + stuffing_length) & 0x00FF) >> 0),
       ]),
-      payload
+      payload,
+      Buffer.alloc(stuffing_length, 0xFF),
     ]);
   }
 }
