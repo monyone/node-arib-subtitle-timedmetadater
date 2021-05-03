@@ -79,6 +79,19 @@ export default class MetadataTransform extends Transform {
 
           let newPMT_descriptor_loop = Buffer.from([]);
           let hasSubtitle = false;
+          // first loop: collect pid
+          const PMT_PIDs: Set<number> = new Set<number>();
+          begin = TSSection.EXTENDED_HEADER_SIZE + 4 + program_info_length;
+          while (begin < TSSection.BASIC_HEADER_SIZE + TSSection.section_length(PMT) - TSSection.CRC_SIZE) {
+            const stream_type = PMT[begin + 0];
+            const elementary_PID = ((PMT[begin + 1] & 0x1F) << 8) | PMT[begin + 2];
+            const ES_info_length = ((PMT[begin + 3] & 0x0F) << 8) | PMT[begin + 4];
+            PMT_PIDs.add(elementary_PID);
+
+            begin += 5 + ES_info_length;
+          }
+
+          // second loop: find id3 pid
           begin = TSSection.EXTENDED_HEADER_SIZE + 4 + program_info_length;
           while (begin < TSSection.BASIC_HEADER_SIZE + TSSection.section_length(PMT) - TSSection.CRC_SIZE) {
             const stream_type = PMT[begin + 0];
@@ -105,7 +118,12 @@ export default class MetadataTransform extends Transform {
 
             if (isSubtitle) {
               hasSubtitle = true;
-              const metadata_PID = elementary_PID + 1; // FIXME
+              let metadata_PID: number = elementary_PID; // FIXME
+              for (let pid = elementary_PID; ; pid++) {
+                if (PMT_PIDs.has(pid)) { continue; }
+                metadata_PID = pid;
+                break;
+              }
 
               if (!this.PMT_SubtitlePids.has(pid)) {
                 this.PMT_SubtitlePids.set(pid, elementary_PID);
