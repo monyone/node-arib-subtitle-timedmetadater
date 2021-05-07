@@ -18,6 +18,7 @@ program
   .option('-h, --output_host <host>', 'output mpeg2ts UDP host')
   .option('-p, --output_port <port>', 'output mpeg2ts UDP port')
   .option('-c, --packet_count <size>', 'output mpeg2ts UDP packet buffer size')
+  .option('-b, --buffer_size <size>', 'UDP buffer size')
 
 program.parse(process.argv);
 const options = program.opts();
@@ -36,7 +37,10 @@ if (options.tcp_port) {
   });
   server.listen(options.tcp_port);
 } else if (options.udp_port) {
-  const server = dgram.createSocket('udp4');
+  const server = dgram.createSocket({
+    type: 'udp4',
+    recvBufferSize: options.buffer_size ?? 1000000,
+  })
   server.on('message', (msg: Buffer) => {
     src.write(msg);
   })
@@ -47,7 +51,10 @@ if (options.tcp_port) {
 }
 
 if (options.output_port) {
-  const socket = dgram.createSocket('udp4')
+  const socket = dgram.createSocket({
+    type: 'udp4',
+    sendBufferSize: options.buffer_size ?? 1000000,
+  })
   const host = options.output_host ?? 'localhost';
   const port = options.output_port ?? 8000
   const count = options.packet_count ?? 100 // MTU 1500 byte だから 7 くらいが限度な気がするけど、ローカルホストだと 100 くらいで安定した
