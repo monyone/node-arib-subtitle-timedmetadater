@@ -218,9 +218,9 @@ export default class MetadataTransform extends Transform {
           while (begin < timedMetadataPES.length) {
             const header = Buffer.from([
               packet[0],
-             ((packet[1] & 0xB0) | ((begin === 0 ? 1 : 0) << 6) | ((timedMetadataPID & 0x1F00) >> 8)),
+             ((packet[1] & 0xA0) | ((begin === 0 ? 1 : 0) << 6) | ((timedMetadataPID & 0x1F00) >> 8)),
              (timedMetadataPID & 0x00FF),
-             ((packet[3] & 0xD0) | (this.Metadata_ContinuityCounters.get(timedMetadataPID)! & 0x0F)),
+             ((packet[3] & 0xC0) | (1 << 4) /* payload */ | (this.Metadata_ContinuityCounters.get(timedMetadataPID)! & 0x0F)),
             ])
             this.Metadata_ContinuityCounters.set(
               timedMetadataPID,
