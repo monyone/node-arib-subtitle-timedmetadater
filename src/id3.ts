@@ -88,10 +88,12 @@ export default class ID3 {
     ]);
   }
 
-  static ID3v2TXXX (text: string) {
+  static ID3v2TXXX (description: string, text: string) {
     const txxx_payload = Buffer.concat([
-      Buffer.from([0x03, 0x00]),
-      Buffer.from(text),
+      Buffer.from([0x03]), // utf-8
+      Buffer.from(description, 'utf-8'),
+      Buffer.from([0x00]),
+      Buffer.from(text, 'utf-8'),
       Buffer.from([0x00]),
     ]);
     const txxx_paylaod_size = Buffer.from([
@@ -101,7 +103,7 @@ export default class ID3 {
       ((txxx_payload.length & 0x000007F) >>  0),
     ]);
     const txxx_frame = Buffer.concat([
-      Buffer.from([0x54, 0x58, 0x58, 0x58]),
+      Buffer.from('TXXX', 'utf-8'),
       txxx_paylaod_size,
       Buffer.from([0x00, 0x00]),
       txxx_payload,
@@ -120,7 +122,39 @@ export default class ID3 {
     ]);
   }
 
-  static timedmetadata (pts: number, text: string) {
+  static ID3v2PRIV (owner: string, binary: Buffer) {
+    const priv_payload = Buffer.concat([
+      Buffer.from(owner, 'utf-8'),
+      Buffer.from([0x00]),
+      binary
+    ]);
+    const priv_paylaod_size = Buffer.from([
+      ((priv_payload.length & 0xFE00000) >> 21),
+      ((priv_payload.length & 0x01FC000) >> 14),
+      ((priv_payload.length & 0x0003F80) >>  7),
+      ((priv_payload.length & 0x000007F) >>  0),
+    ]);
+    const priv_frame = Buffer.concat([
+      Buffer.from('PRIV', 'utf-8'),
+      priv_paylaod_size,
+      Buffer.from([0x00, 0x00]),
+      priv_payload,
+    ]);
+    const priv_frame_size = Buffer.from([
+      ((priv_frame.length & 0xFE00000) >> 21),
+      ((priv_frame.length & 0x01FC000) >> 14),
+      ((priv_frame.length & 0x0003F80) >>  7),
+      ((priv_frame.length & 0x000007F) >>  0),
+    ]);
+
+    return Buffer.concat([
+      Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00, 0x00]),
+      priv_frame_size,
+      priv_frame,
+    ]);
+  }
+
+  static timedmetadata (pts: number, id3: Buffer) {
     const header = Buffer.from([
       0x00, 0x00, 0x01, 0xbd, // +2 bytes
     ]);
@@ -135,7 +169,6 @@ export default class ID3 {
       ((((pts >>> 0) & 0x0000007F) >>  0) << 1) | 1,
     ]);
 
-    const id3 = this.ID3v2TXXX(text);
     // TSPES.PES_HEADER_SIZE + flags + PES_header_data_length + PTS + payload
     const without_padding_length = TSPES.PES_HEADER_SIZE + 2 + 1 + 5 /* PTS */ + 5 /* id3-padding */ + id3.length;
     const packet_payload_size = (TSPacket.PACKET_SIZE - TSPacket.HEADER_SIZE);

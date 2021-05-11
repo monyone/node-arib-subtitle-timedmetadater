@@ -212,7 +212,8 @@ export default class MetadataTransform extends Transform {
 
           const timedMetadataPID = this.Subtitle_ID3Pids.get(pid)!;
           const subtitleData = SubtitlePES.slice(TSPES.PES_HEADER_SIZE + (3 + PES_header_data_length));
-          const timedMetadataPES = ID3.timedmetadata(pts, subtitleData.toString('base64'));
+          const id3 = ID3.ID3v2PRIV('aribb24.js', subtitleData);
+          const timedMetadataPES = ID3.timedmetadata(pts, id3);
 
           let begin = 0
           while (begin < timedMetadataPES.length) {
