@@ -94,7 +94,6 @@ export default class ID3 {
       Buffer.from(description, 'utf-8'),
       Buffer.from([0x00]),
       Buffer.from(text, 'utf-8'),
-      Buffer.from([0x00]),
     ]);
     const txxx_paylaod_size = Buffer.from([
       ((txxx_payload.length & 0xFE00000) >> 21),
