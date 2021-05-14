@@ -169,7 +169,7 @@ export default class ID3 {
     ]);
 
     // TSPES.PES_HEADER_SIZE + flags + PES_header_data_length + PTS + payload
-    const without_padding_length = TSPES.PES_HEADER_SIZE + 2 + 1 + 5 /* PTS */ + 5 /* id3-padding */ + id3.length;
+    const without_padding_length = TSPES.PES_HEADER_SIZE + 2 + 1 + 5 /* PTS */ + 5 /* padding for ffmepg metadata(0x15) handling*/ + id3.length;
     const packet_payload_size = (TSPacket.PACKET_SIZE - TSPacket.HEADER_SIZE);
     const stuffing_length = packet_payload_size - (without_padding_length % packet_payload_size);
 
@@ -177,8 +177,11 @@ export default class ID3 {
       flags,
       Buffer.from([5] /* PTS */),
       PTS,
-      Buffer.alloc(5, 0), /* FIXME: なぜか ffmpeg で変換すると native, hls.js で parse した際に 5 byte 分 id3 の先頭が落とされる... */
-      /* なぜ? 5 byte padding を入れてみるけど ... 効果あるのかどうか、通常どおりパースされる保証があるのか未知数... */
+      Buffer.alloc(5, 0), /* padding for ffmepg metadata(0x15) handling */
+      /* ffmpeg は metadata (0x15) の先頭を 5byte をヘッダーだと思って、スキップしてデータ処理をする */
+      /* この 5byte のヘッダーは stream_id 0xbd ではなく、stream_id 0xfc の時にあるものなので、timed-id3 でスキップは不適格 */
+      /* なので、 ffmpeg じゃなく直で利用する場合には、この 5 byteパディングは要らない */ 
+      /* TODO: オプションで ffmpeg と正常ハンドリング と変えられるようにしておくこと */
       id3,
     ]);
 
