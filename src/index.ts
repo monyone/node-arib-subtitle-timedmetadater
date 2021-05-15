@@ -10,12 +10,17 @@ import ID3 from './id3'
 
 export default class MetadataTransform extends Transform {
   private packetQueue = new TSPacketQueue();
+
   private PAT_TSSectionQueue = new TSSectionQueue();
+
   private PMT_TSSectionQueues = new Map<number, TSSectionQueue>();
-  private PMT_ContinuityCounters = new Map<number, number>();
   private PMT_SubtitlePids = new Map<number, number>();
+  private PMT_ID3Pids = new Map<number, number>();
+  private PMT_ContinuityCounters = new Map<number, number>();
+
   private Subtitle_TSPESQueues = new Map<number, TSPESQueue>();
-  private Subtitle_ID3Pids = new Map<number, number>();
+  private Subtitle_PMTPids = new Map<number, Set<number>>();
+
   private Metadata_ContinuityCounters = new Map<number, number>();
 
   _transform (chunk: Buffer, encoding: string, callback: TransformCallback): void {
@@ -78,27 +83,15 @@ export default class MetadataTransform extends Transform {
           ])
 
           let newPMT_descriptor_loop = Buffer.from([]);
-          let hasSubtitle = false;
-          // first loop: collect pid
+          let subtitlePid = -1, lastPid = pid;
+
           const PMT_PIDs: Set<number> = new Set<number>();
+
           begin = TSSection.EXTENDED_HEADER_SIZE + 4 + program_info_length;
           while (begin < TSSection.BASIC_HEADER_SIZE + TSSection.section_length(PMT) - TSSection.CRC_SIZE) {
             const stream_type = PMT[begin + 0];
             const elementary_PID = ((PMT[begin + 1] & 0x1F) << 8) | PMT[begin + 2];
             const ES_info_length = ((PMT[begin + 3] & 0x0F) << 8) | PMT[begin + 4];
-            PMT_PIDs.add(elementary_PID);
-
-            begin += 5 + ES_info_length;
-          }
-
-          // second loop: find id3 pid
-          begin = TSSection.EXTENDED_HEADER_SIZE + 4 + program_info_length;
-          while (begin < TSSection.BASIC_HEADER_SIZE + TSSection.section_length(PMT) - TSSection.CRC_SIZE) {
-            const stream_type = PMT[begin + 0];
-            const elementary_PID = ((PMT[begin + 1] & 0x1F) << 8) | PMT[begin + 2];
-            const ES_info_length = ((PMT[begin + 3] & 0x0F) << 8) | PMT[begin + 4];
-
-            let isSubtitle = false;
 
             let descriptor = begin + 5;
             while (descriptor < begin + 5 + ES_info_length) {
@@ -109,52 +102,76 @@ export default class MetadataTransform extends Transform {
                 const component_tag = PMT[descriptor + 2];
 
                 if (0x30 <= component_tag && component_tag <= 0x37 || component_tag == 0x87) {
-                  isSubtitle = true;
+                  subtitlePid = elementary_PID;
                 }
               }
 
               descriptor += 2 + descriptor_length;
             }
 
-            if (isSubtitle) {
-              hasSubtitle = true;
-              let metadata_PID: number = elementary_PID; // FIXME
-              for (let pid = elementary_PID; ; pid++) {
-                if (PMT_PIDs.has(pid)) { continue; }
-                metadata_PID = pid;
-                break;
-              }
-
-              if (!this.PMT_SubtitlePids.has(pid)) {
-                this.PMT_SubtitlePids.set(pid, elementary_PID);
-                this.Subtitle_TSPESQueues.set(elementary_PID, new TSPESQueue());
-                this.Subtitle_ID3Pids.set(elementary_PID, metadata_PID);
-                this.Metadata_ContinuityCounters.set(metadata_PID, 0);
-              }
-
-              newPMT_descriptor_loop = Buffer.concat([
-                newPMT_descriptor_loop,
-                PMT.slice(begin, begin + 5 + ES_info_length),
-                ID3.metadata_elementary_stream(metadata_PID),
-              ]);
-            } else {
-              newPMT_descriptor_loop = Buffer.concat([
-                newPMT_descriptor_loop,
-                PMT.slice(begin, begin + 5 + ES_info_length),
-              ]);
-            }
-
+            lastPid = elementary_PID;
+            PMT_PIDs.add(elementary_PID);
             begin += 5 + ES_info_length;
           }
 
-          if (!hasSubtitle && this.PMT_SubtitlePids.has(pid)) {
-            const old_subtitle_pid = this.PMT_SubtitlePids.get(pid)!;
-            const old_metadata_pid = this.Subtitle_ID3Pids.get(old_subtitle_pid)!;
+          let id3_PID: number = lastPid; // TODO: いい感じのPIDを見つけたい
+          {
+            const already_ID3Pids = new Set<number>(this.PMT_ID3Pids.values());
+            if (this.PMT_ID3Pids.has(pid)) { already_ID3Pids.delete(this.PMT_ID3Pids.get(pid)!); }
 
-            this.PMT_SubtitlePids.delete(pid);
-            this.Subtitle_TSPESQueues.delete(old_subtitle_pid);
-            this.Subtitle_ID3Pids.delete(old_subtitle_pid);
-            this.Metadata_ContinuityCounters.delete(old_metadata_pid);
+            for (; ; id3_PID++) {
+              if (PMT_PIDs.has(id3_PID)) { continue; }
+              if (already_ID3Pids.has(id3_PID)) { continue; }
+              break;
+            }
+          }
+          this.PMT_ID3Pids.set(pid, id3_PID);
+
+          newPMT_descriptor_loop = Buffer.concat([
+            PMT.slice(
+              TSSection.EXTENDED_HEADER_SIZE + 4 + program_info_length,
+              TSSection.BASIC_HEADER_SIZE + TSSection.section_length(PMT) - TSSection.CRC_SIZE
+            ),
+            ID3.metadata_elementary_stream(id3_PID),
+          ])
+
+          if (subtitlePid >= 0) {
+            if (!this.PMT_SubtitlePids.has(pid)) {
+              this.PMT_SubtitlePids.set(pid, subtitlePid);
+              this.Subtitle_TSPESQueues.set(subtitlePid, new TSPESQueue());
+
+              const PMTs = this.Subtitle_PMTPids.get(subtitlePid) ?? new Set();
+              PMTs.add(pid);
+              this.Subtitle_PMTPids.set(subtitlePid, PMTs);
+            } else {
+              const oldSubtitlePid = this.PMT_SubtitlePids.get(pid)!;
+              if (subtitlePid !== oldSubtitlePid) {
+                const oldPMTs = this.Subtitle_PMTPids.get(oldSubtitlePid) ?? new Set<number>();
+                oldPMTs.delete(pid);
+                this.Subtitle_PMTPids.set(oldSubtitlePid, oldPMTs);
+
+                const newPMTs = this.Subtitle_PMTPids.get(subtitlePid) ?? new Set<number>();
+                newPMTs.add(pid);
+                this.Subtitle_PMTPids.set(subtitlePid, newPMTs);
+
+                this.PMT_SubtitlePids.set(pid, subtitlePid);
+                this.Subtitle_TSPESQueues.set(subtitlePid, new TSPESQueue());
+
+                if (!this.Subtitle_PMTPids.has(oldSubtitlePid)) {
+                  this.Subtitle_TSPESQueues.delete(oldSubtitlePid);
+                }
+              }
+            }
+          } else if (this.PMT_SubtitlePids.has(pid)) {
+            const oldSubtitlePid = this.PMT_SubtitlePids.get(pid)!;
+
+            const oldPMTs = this.Subtitle_PMTPids.get(oldSubtitlePid) ?? new Set<number>();
+            oldPMTs.delete(pid);
+            this.Subtitle_PMTPids.set(oldSubtitlePid, oldPMTs);
+
+            if (!this.Subtitle_PMTPids.has(oldSubtitlePid)) {
+              this.Subtitle_TSPESQueues.delete(oldSubtitlePid);
+            }
           }
 
           newPMT = Buffer.concat([
@@ -210,33 +227,37 @@ export default class MetadataTransform extends Transform {
             continue; // FIXME!
           } // FIXME!
 
-          const timedMetadataPID = this.Subtitle_ID3Pids.get(pid)!;
-          const subtitleData = SubtitlePES.slice(TSPES.PES_HEADER_SIZE + (3 + PES_header_data_length));
-          const id3 = ID3.ID3v2PRIV('aribb24.js', subtitleData);
-          const timedMetadataPES = ID3.timedmetadata(pts, id3);
+          for (const PMT_PID of Array.from(this.Subtitle_PMTPids.get(pid) ?? [])) {
+            if (!this.PMT_ID3Pids.has(PMT_PID)) { continue; }
 
-          let begin = 0
-          while (begin < timedMetadataPES.length) {
-            const header = Buffer.from([
-              packet[0],
-             ((packet[1] & 0xA0) | ((begin === 0 ? 1 : 0) << 6) | ((timedMetadataPID & 0x1F00) >> 8)),
-             (timedMetadataPID & 0x00FF),
-             ((packet[3] & 0xC0) | (1 << 4) /* payload */ | (this.Metadata_ContinuityCounters.get(timedMetadataPID)! & 0x0F)),
-            ])
-            this.Metadata_ContinuityCounters.set(
-              timedMetadataPID,
-              (this.Metadata_ContinuityCounters.get(timedMetadataPID)! + 1) & 0x0F
-            );
+            const timedMetadataPID = this.PMT_ID3Pids.get(PMT_PID)!;
+            const subtitleData = SubtitlePES.slice(TSPES.PES_HEADER_SIZE + (3 + PES_header_data_length));
+            const id3 = ID3.ID3v2PRIV('aribb24.js', subtitleData);
+            const timedMetadataPES = ID3.timedmetadata(pts, id3);
 
-            const next = begin + (TSPacket.PACKET_SIZE - TSPacket.HEADER_SIZE)
-            this.push(
-              Buffer.concat([
-                header,
-                timedMetadataPES.slice(begin, next)
+            let begin = 0
+            while (begin < timedMetadataPES.length) {
+              const header = Buffer.from([
+                packet[0],
+               ((packet[1] & 0xA0) | ((begin === 0 ? 1 : 0) << 6) | ((timedMetadataPID & 0x1F00) >> 8)),
+               (timedMetadataPID & 0x00FF),
+               ((packet[3] & 0xC0) | (1 << 4) /* payload */ | (this.Metadata_ContinuityCounters.get(timedMetadataPID)! & 0x0F)),
               ])
-            );
+              this.Metadata_ContinuityCounters.set(
+                timedMetadataPID,
+                (this.Metadata_ContinuityCounters.get(timedMetadataPID)! + 1) & 0x0F
+              );
 
-            begin = next
+              const next = begin + (TSPacket.PACKET_SIZE - TSPacket.HEADER_SIZE)
+              this.push(
+                Buffer.concat([
+                  header,
+                  timedMetadataPES.slice(begin, next)
+                ])
+              );
+
+              begin = next
+            }
           }
         }
 
