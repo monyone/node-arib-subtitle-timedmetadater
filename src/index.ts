@@ -157,7 +157,7 @@ export default class MetadataTransform extends Transform {
                 this.PMT_SubtitlePids.set(pid, subtitlePid);
                 this.Subtitle_TSPESQueues.set(subtitlePid, new TSPESQueue());
 
-                if (!this.Subtitle_PMTPids.has(oldSubtitlePid)) {
+                if (!this.Subtitle_PMTPids.has(oldSubtitlePid) || this.Subtitle_PMTPids.get(oldSubtitlePid)!.size === 0) {
                   this.Subtitle_TSPESQueues.delete(oldSubtitlePid);
                 }
               }
@@ -169,7 +169,7 @@ export default class MetadataTransform extends Transform {
             oldPMTs.delete(pid);
             this.Subtitle_PMTPids.set(oldSubtitlePid, oldPMTs);
 
-            if (!this.Subtitle_PMTPids.has(oldSubtitlePid)) {
+            if (!this.Subtitle_PMTPids.has(oldSubtitlePid) || this.Subtitle_PMTPids.get(oldSubtitlePid)!.size === 0) {
               this.Subtitle_TSPESQueues.delete(oldSubtitlePid);
             }
           }
