@@ -125,7 +125,16 @@ export default class MetadataTransform extends Transform {
               break;
             }
           }
-          this.PMT_ID3Pids.set(pid, id3_PID);
+          if (!this.PMT_ID3Pids.has(pid)) { 
+            this.PMT_ID3Pids.set(pid, id3_PID);
+            this.Metadata_ContinuityCounters.set(id3_PID, 0);
+          } else if (this.PMT_ID3Pids.get(pid)! !== id3_PID) {
+            const old_id3_PID = this.PMT_ID3Pids.get(pid);
+            this.Metadata_ContinuityCounters.delete(id3_PID);
+
+            this.PMT_ID3Pids.set(pid, id3_PID);
+            this.Metadata_ContinuityCounters.set(id3_PID, 0);
+          }
 
           newPMT_descriptor_loop = Buffer.concat([
             PMT.slice(
