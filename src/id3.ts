@@ -94,6 +94,7 @@ export default class ID3 {
       Buffer.from(description, 'utf-8'),
       Buffer.from([0x00]),
       Buffer.from(text, 'utf-8'),
+      Buffer.from([0x00]), // for video.js TXXX handling (必ず NULL 終端にしておく方がいい、 NULL 終端前提の場合がある)
     ]);
     const txxx_paylaod_size = Buffer.from([
       ((txxx_payload.length & 0xFE00000) >> 21),
