@@ -83,9 +83,10 @@ export default class MetadataTransform extends Transform {
           ])
 
           let newPMT_descriptor_loop = Buffer.from([]);
-          let subtitlePid = -1, lastPid = pid;
+          let subtitlePid = -1;
 
           const PMT_PIDs: Set<number> = new Set<number>();
+          PMT_PIDs.add(pid);
 
           begin = TSSection.EXTENDED_HEADER_SIZE + 4 + program_info_length;
           while (begin < TSSection.BASIC_HEADER_SIZE + TSSection.section_length(PMT) - TSSection.CRC_SIZE) {
@@ -109,17 +110,16 @@ export default class MetadataTransform extends Transform {
               descriptor += 2 + descriptor_length;
             }
 
-            lastPid = elementary_PID;
             PMT_PIDs.add(elementary_PID);
             begin += 5 + ES_info_length;
           }
 
-          let id3_PID: number = lastPid; // TODO: いい感じのPIDを見つけたい
+          let id3_PID: number = 0x1FFE; // TODO: いい感じのPIDを見つけたい。ここがアドホックでトラブルの元。
           {
             const already_ID3Pids = new Set<number>(this.PMT_ID3Pids.values());
             if (this.PMT_ID3Pids.has(pid)) { already_ID3Pids.delete(this.PMT_ID3Pids.get(pid)!); }
 
-            for (; ; id3_PID++) {
+            for (; ; id3_PID--) {
               if (PMT_PIDs.has(id3_PID)) { continue; }
               if (already_ID3Pids.has(id3_PID)) { continue; }
               break;
@@ -129,7 +129,6 @@ export default class MetadataTransform extends Transform {
             this.PMT_ID3Pids.set(pid, id3_PID);
             this.Metadata_ContinuityCounters.set(id3_PID, 0);
           } else if (this.PMT_ID3Pids.get(pid)! !== id3_PID) {
-            const old_id3_PID = this.PMT_ID3Pids.get(pid);
             this.Metadata_ContinuityCounters.delete(id3_PID);
 
             this.PMT_ID3Pids.set(pid, id3_PID);
