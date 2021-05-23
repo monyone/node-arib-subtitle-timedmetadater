@@ -173,6 +173,7 @@ export default class MetadataTransform extends Transform {
             }
           } else if (this.PMT_SubtitlePids.has(pid)) {
             const oldSubtitlePid = this.PMT_SubtitlePids.get(pid)!;
+            this.PMT_SubtitlePids.delete(pid);
 
             const oldPMTs = this.Subtitle_PMTPids.get(oldSubtitlePid) ?? new Set<number>();
             oldPMTs.delete(pid);
