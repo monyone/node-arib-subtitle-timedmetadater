@@ -6,7 +6,10 @@ import { TSPacket, TSPacketQueue } from 'arib-mpeg2ts-parser';
 import { TSSection, TSSectionQueue, TSSectionPacketizer } from 'arib-mpeg2ts-parser';
 import { TSPES, TSPESQueue } from 'arib-mpeg2ts-parser';
 
+
 import ID3 from './id3'
+
+export { default as FFmpegID3PaddingTransform } from './ffmpeg-id3-padding-transform'
 
 export default class MetadataTransform extends Transform {
   private packetQueue = new TSPacketQueue();
