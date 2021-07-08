@@ -3,6 +3,8 @@
 import fs from 'fs';
 import dgram from 'dgram';
 import net from 'net';
+import http from 'http';
+import https from 'https'
 import { PassThrough } from 'stream';
 
 import MetadataTransform from './index'
@@ -14,7 +16,9 @@ program
   .option('-i, --input <path>', 'input mpeg2ts path')
   .option('-t, --tcp_port <port>', 'input tcp port')
   .option('-u, --udp_port <port>', 'input udp port')
-  .option('-h, --host <address>', 'input host address')
+  .option('-h, --host <address>', 'bind host address for udp/tcp')
+  .option('--http <url>', 'input url for http GET request')
+  .option('--https <url>', 'input url for https GET request')
   .option('-b, --recv_buffer_size <size>', 'input udp recvBufferSize')
   .option('-o, --output <path>', 'output mpeg2ts path');
 
@@ -29,7 +33,11 @@ src
   .pipe(new MetadataTransform())
   .pipe(dst);
 
-if (options.tcp_port) {
+if (options.https) {
+  https.get(options.https, (res => { res.pipe(src); }));
+} else if (options.http) {
+  http.get(options.http, (res => { res.pipe(src); }));
+} else if (options.tcp_port) {
   const server = net.createServer((socket) => {
     socket.pipe(src);
   });
