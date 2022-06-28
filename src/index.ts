@@ -18,19 +18,11 @@ export default class MetadataTransform extends Transform {
 
   private PMT_TSSectionQueues = new Map<number, TSSectionQueue>();
   private PMT_SubtitlePids = new Map<number, number>();
-  private PMT_SuperimposePids = new Map<number, number>();
   private PMT_ID3Pids = new Map<number, number>();
-  private PMT_PCRPids = new Map<number, number>();
-  private PMT_PCRs = new Map<number, number>();
   private PMT_ContinuityCounters = new Map<number, number>();
 
   private Subtitle_TSPESQueues = new Map<number, TSPESQueue>();
   private Subtitle_PMTPids = new Map<number, Set<number>>();
-
-  private Superimpose_TSPESQueues = new Map<number, TSPESQueue>();
-  private Superimpose_PMTPids = new Map<number, Set<number>>();
-
-  private PCR_PMTPids = new Map<number,  Set<number>>();
 
   private Metadata_ContinuityCounters = new Map<number, number>();
 
@@ -73,20 +65,6 @@ export default class MetadataTransform extends Transform {
 
           let newPMT = Buffer.from(PMT.slice(0, TSSection.EXTENDED_HEADER_SIZE + 2))
 
-          const PCR_PID = ((PMT[TSSection.EXTENDED_HEADER_SIZE + 0] & 0x1F) << 8) | PMT[TSSection.EXTENDED_HEADER_SIZE + 1];
-          if (this.PMT_PCRPids.has(pid)) {
-            const old_PCR_PID = this.PMT_PCRPids.get(pid)!;
-            const set = this.PCR_PMTPids.get(old_PCR_PID) ?? new Set<number>();
-            set.delete(pid);
-            this.PCR_PMTPids.set(old_PCR_PID, set);
-          }
-          {
-            const set = this.PCR_PMTPids.get(PCR_PID) ?? new Set<number>();
-            set.add(pid);
-            this.PCR_PMTPids.set(PCR_PID, set);
-          }
-          this.PMT_PCRPids.set(pid, PCR_PID);
-
           const program_info_length = ((PMT[TSSection.EXTENDED_HEADER_SIZE + 2] & 0x0F) << 8) | PMT[TSSection.EXTENDED_HEADER_SIZE + 3];
           let newPMT_program_info = Buffer.from([]);
           let begin = TSSection.EXTENDED_HEADER_SIZE + 4;
@@ -109,7 +87,6 @@ export default class MetadataTransform extends Transform {
 
           let newPMT_descriptor_loop = Buffer.from([]);
           let subtitlePid = -1;
-          let superimposePid = -1;
 
           const PMT_PIDs: Set<number> = new Set<number>();
           PMT_PIDs.add(pid);
@@ -130,8 +107,6 @@ export default class MetadataTransform extends Transform {
 
                 if (0x30 <= component_tag && component_tag <= 0x37 || component_tag == 0x87) {
                   subtitlePid = elementary_PID;
-                } else if (0x38 <= component_tag && component_tag <= 0x3F) {
-                  superimposePid = elementary_PID;
                 }
               }
 
@@ -211,46 +186,6 @@ export default class MetadataTransform extends Transform {
             }
           }
 
-          if (superimposePid >= 0) {
-            if (!this.PMT_SuperimposePids.has(pid)) {
-              this.PMT_SuperimposePids.set(pid, superimposePid);
-              this.Superimpose_TSPESQueues.set(superimposePid, new TSPESQueue());
-
-              const PMTs = this.Superimpose_PMTPids.get(superimposePid) ?? new Set();
-              PMTs.add(pid);
-              this.Superimpose_PMTPids.set(superimposePid, PMTs);
-            } else {
-              const oldSuperimposePid = this.PMT_SuperimposePids.get(pid)!;
-              if (superimposePid !== oldSuperimposePid) {
-                const oldPMTs = this.Superimpose_PMTPids.get(oldSuperimposePid) ?? new Set<number>();
-                oldPMTs.delete(pid);
-                this.Superimpose_PMTPids.set(oldSuperimposePid, oldPMTs);
-
-                const newPMTs = this.Superimpose_PMTPids.get(superimposePid) ?? new Set<number>();
-                newPMTs.add(pid);
-                this.Superimpose_PMTPids.set(superimposePid, newPMTs);
-
-                this.PMT_SuperimposePids.set(pid, superimposePid);
-                this.Superimpose_TSPESQueues.set(superimposePid, new TSPESQueue());
-
-                if (!this.Superimpose_PMTPids.has(oldSuperimposePid) || this.Superimpose_PMTPids.get(oldSuperimposePid)!.size === 0) {
-                  this.Superimpose_TSPESQueues.delete(oldSuperimposePid);
-                }
-              }
-            }
-          } else if (this.PMT_SuperimposePids.has(pid)) {
-            const oldSuperimposePid = this.PMT_SuperimposePids.get(pid)!;
-            this.PMT_SuperimposePids.delete(pid);
-
-            const oldPMTs = this.Superimpose_PMTPids.get(oldSuperimposePid) ?? new Set<number>();
-            oldPMTs.delete(pid);
-            this.Superimpose_PMTPids.set(oldSuperimposePid, oldPMTs);
-
-            if (!this.Superimpose_PMTPids.has(oldSuperimposePid) || this.Superimpose_PMTPids.get(oldSuperimposePid)!.size === 0) {
-              this.Superimpose_TSPESQueues.delete(oldSuperimposePid);
-            }
-          }
-
           newPMT = Buffer.concat([
             newPMT,
             newPMT_program_info_length,
@@ -300,9 +235,9 @@ export default class MetadataTransform extends Transform {
           const data_group = TSPES.PES_HEADER_SIZE + (3 + PES_header_data_length) + (3 + PES_data_packet_header_length);
           const data_group_id = (SubtitlePES[data_group + 0] & 0xFC) >> 2;
 
-          if ((data_group_id & 0x0F) === 0) {
-            continue;
-          }
+          if ((data_group_id & 0x0F) != 1) { // FIXME!
+            continue; // FIXME!
+          } // FIXME!
 
           for (const PMT_PID of Array.from(this.Subtitle_PMTPids.get(pid) ?? [])) {
             if (!this.PMT_ID3Pids.has(PMT_PID)) { continue; }
@@ -335,69 +270,6 @@ export default class MetadataTransform extends Transform {
 
               begin = next
             }
-          }
-        }
-
-        this.push(packet);
-      } else if (this.Superimpose_TSPESQueues.has(pid)) {
-        const Superimpose_TSPESQueue = this.Superimpose_TSPESQueues.get(pid)!;
-  
-        Superimpose_TSPESQueue.push(packet);
-        while (!Superimpose_TSPESQueue.isEmpty()) {
-          const SuperimposePES = Superimpose_TSPESQueue.pop()!;
-
-          const PES_data_packet_header_length = (SuperimposePES[TSPES.PES_HEADER_SIZE+ 2] & 0x0F);
-          const data_group = TSPES.PES_HEADER_SIZE + (3 + PES_data_packet_header_length);
-          const data_group_id = (SuperimposePES[data_group + 0] & 0xFC) >> 2;
-
-          if ((data_group_id & 0x0F) === 0) {
-            continue;
-          }
-
-          for (const PMT_PID of Array.from(this.Superimpose_PMTPids.get(pid) ?? [])) {
-            if (!this.PMT_ID3Pids.has(PMT_PID)) { continue; }
-
-            const timedMetadataPID = this.PMT_ID3Pids.get(PMT_PID)!;
-            const superimposeData = SuperimposePES.slice(TSPES.PES_HEADER_SIZE);
-            const id3 = ID3.ID3v2PRIV('aribb24.js', superimposeData);
-            const pts = this.PMT_PCRs.get(PMT_PID);
-            if (pts == null) { continue; }
-
-            const timedMetadataPES = ID3.timedmetadata(pts, id3);
-
-            let begin = 0
-            while (begin < timedMetadataPES.length) {
-              const header = Buffer.from([
-                packet[0],
-               ((packet[1] & 0xA0) | ((begin === 0 ? 1 : 0) << 6) | ((timedMetadataPID & 0x1F00) >> 8)),
-               (timedMetadataPID & 0x00FF),
-               ((packet[3] & 0xC0) | (1 << 4) /* payload */ | (this.Metadata_ContinuityCounters.get(timedMetadataPID)! & 0x0F)),
-              ])
-              this.Metadata_ContinuityCounters.set(
-                timedMetadataPID,
-                (this.Metadata_ContinuityCounters.get(timedMetadataPID)! + 1) & 0x0F
-              );
-
-              const next = begin + (TSPacket.PACKET_SIZE - TSPacket.HEADER_SIZE)
-              this.push(
-                Buffer.concat([
-                  header,
-                  timedMetadataPES.slice(begin, next)
-                ])
-              );
-
-              begin = next
-            }
-          }
-        }
-
-        this.push(packet);
-      } else if (this.PCR_PMTPids.has(pid)) {
-        if (TSPacket.has_pcr(packet)) {
-          const PCR = TSPacket.pcr(packet);
-
-          for (const PMT_PID of Array.from(this.PCR_PMTPids.get(pid) ?? [])) {
-            this.PMT_PCRs.set(PMT_PID, PCR);
           }
         }
 
